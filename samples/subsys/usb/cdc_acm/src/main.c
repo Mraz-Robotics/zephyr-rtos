@@ -24,6 +24,7 @@
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/usb/usbd.h>
 #include <zephyr/logging/log.h>
+
 LOG_MODULE_REGISTER(cdc_acm_echo, LOG_LEVEL_INF);
 
 const struct device *const uart_dev = DEVICE_DT_GET_ONE(zephyr_cdc_acm_uart);
@@ -113,6 +114,7 @@ static void interrupt_handler(const struct device *dev, void *user_data)
 	ARG_UNUSED(user_data);
 
 	while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
+
 		if (!rx_throttled && uart_irq_rx_ready(dev)) {
 			int recv_len, rb_len;
 			uint8_t buffer[64];

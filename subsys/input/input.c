@@ -9,7 +9,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/iterable_sections.h>
 
-LOG_MODULE_REGISTER(input, CONFIG_INPUT_LOG_LEVEL);
+LOG_MODULE_REGISTER(input, LOG_LEVEL_DBG);
 
 #ifdef CONFIG_INPUT_MODE_THREAD
 

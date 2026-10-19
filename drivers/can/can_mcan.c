@@ -514,13 +514,13 @@ static void can_mcan_tx_event_handler(const struct device *dev)
 {
 	const struct can_mcan_config *config = dev->config;
 	const struct can_mcan_callbacks *cbs = config->callbacks;
-	struct can_mcan_data *data = dev->data;
-	struct can_mcan_tx_event_fifo tx_event;
-	can_tx_callback_t tx_cb;
-	void *user_data;
-	uint32_t event_idx;
-	uint32_t tx_idx;
-	uint32_t txefs;
+	volatile struct can_mcan_data *data = dev->data;
+	volatile struct can_mcan_tx_event_fifo tx_event;
+	volatile can_tx_callback_t tx_cb;
+	volatile void *user_data;
+	volatile uint32_t event_idx;
+	volatile uint32_t tx_idx;
+	volatile uint32_t txefs;
 	int err;
 
 	err = can_mcan_read_reg(dev, CAN_MCAN_TXEFS, &txefs);

@@ -1,0 +1,45 @@
+description: |
+  Group of GPIO-controlled outputs.
+
+  Each Output is defined in a child node of the gpio-outputs node.
+
+  Here is an example which defines three Outputs in the node /outputs:
+
+  / {
+  	outputs {
+  		compatible = "mr,gpio-output";
+  		out_0 {
+  			gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+  		};
+  		out_1 {
+  			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+  		};
+  		out_2 {
+  			gpios = <&gpio1 15 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+  		};
+  	};
+  };
+
+  Above:
+
+  - out_0 is pin 1 on gpio0. The pin is on when the pin is low,
+    and off when the pin is high.
+  - out_1 is pin 2 on gpio0. The pin is on when the pin is high,
+    and off when it is low.
+  - out_2 is pin 15 on gpio1. The pin is on when the pin is low,
+    and the pin's internal pull-up resistor should be enabled.
+
+compatible: "mr,gpio-output"
+
+child-binding:
+  description: GPIO pin child node
+  properties:
+    gpios:
+      type: phandle-array
+      required: true
+    label:
+      type: string
+      description: |
+        Human readable string describing the pin. It can be used by an
+        application to identify this pin or to retrieve its number/index
+        (i.e. child node number) on the parent device.

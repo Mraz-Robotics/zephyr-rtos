@@ -16,7 +16,7 @@
 #include <zephyr/sys_clock.h>
 #include <zephyr/drivers/uart.h>
 
-LOG_MODULE_REGISTER(futaba_sbus, CONFIG_INPUT_LOG_LEVEL);
+LOG_MODULE_REGISTER(futaba_sbus, LOG_LEVEL_DBG);
 
 /* Driver config */
 struct sbus_input_channel {
@@ -27,8 +27,8 @@ struct sbus_input_channel {
 
 const struct uart_config uart_cfg_sbus = {
 	.baudrate = 100000,
-	.parity = UART_CFG_PARITY_EVEN,
-	.stop_bits = UART_CFG_STOP_BITS_2,
+	.parity = UART_CFG_PARITY_NONE,
+	.stop_bits = UART_CFG_STOP_BITS_1,
 	.data_bits = UART_CFG_DATA_BITS_8,
 	.flow_ctrl = UART_CFG_FLOW_CTRL_NONE
 };
@@ -75,6 +75,11 @@ struct input_sbus_data {
 	uint16_t last_reported_value[SBUS_CHANNEL_COUNT];
 	int8_t channel_mapping[SBUS_CHANNEL_COUNT];
 
+	//FIXME: added by Michal
+	bool receiver_connected;
+	bool controller_connected;
+	bool frame_lost;
+
 	K_KERNEL_STACK_MEMBER(thread_stack, CONFIG_INPUT_SBUS_THREAD_STACK_SIZE);
 };
 
@@ -96,6 +101,7 @@ static void input_sbus_report(const struct device *dev, unsigned int sbus_channe
 		switch (config->channel_info[channel].type) {
 		case INPUT_EV_ABS:
 		case INPUT_EV_MSC:
+		case INPUT_EVT_SBUS: //FIXME: added by Michal
 			input_report(dev, config->channel_info[channel].type,
 				     config->channel_info[channel].zephyr_code, value, false,
 				     K_FOREVER);
@@ -128,12 +134,16 @@ static void input_sbus_input_report_thread(const struct device *dev, void *dummy
 	unsigned int key;
 	int ret;
 	bool connected_reported = false;
+	//FIXME: added by Michal
+	bool receiver_connected = false;
+	bool controller_connected = false;
+	bool frame_lost = false;
 
 	while (true) {
 		if (!data->in_sync) {
 			k_sem_take(&data->report_lock, K_FOREVER);
 			if (data->in_sync) {
-				LOG_DBG("SBUS receiver connected");
+				// printk("SBUS receiver connected\n");
 			} else {
 				continue;
 			}
@@ -150,8 +160,15 @@ static void input_sbus_input_report_thread(const struct device *dev, void *dummy
 				data->xfer_bytes = 0;
 				irq_unlock(key);
 
+				//FIXME: added by Michal
+				if (data->receiver_connected) {
+					LOG_ERR("SBUS receiver connection lost (UART timeout)\n");
+					input_report(dev, INPUT_EV_ABS, INPUT_RECEIVER_CONN_STATUS, 0, false, K_FOREVER);
+					data->receiver_connected = false;
+				}
+
 				connected_reported = false;
-				LOG_DBG("SBUS receiver connection lost");
+				// printk("SBUS receiver connection lost\n");
 
 				/* Report connection lost */
 				continue;
@@ -160,12 +177,36 @@ static void input_sbus_input_report_thread(const struct device *dev, void *dummy
 
 		if (connected_reported &&
 		    data->sbus_frame[SBUS_BYTE24_IDX] & SBUS_BYTE24_FRAME_LOST) {
-			LOG_DBG("SBUS controller connection lost");
+			// LOG_DBG("SBUS controller connection lost\n");
 			connected_reported = false;
 		} else if (!connected_reported &&
 			   !(data->sbus_frame[SBUS_BYTE24_IDX] & SBUS_BYTE24_FRAME_LOST)) {
-			LOG_DBG("SBUS controller connected");
+			// LOG_DBG("SBUS controller connected\n");
 			connected_reported = true;
+		}
+
+		controller_connected = !(data->sbus_frame[SBUS_BYTE24_IDX] & SBUS_BYTE24_FAILSAFE);
+		if (controller_connected != data->controller_connected) {
+			if (controller_connected) {
+				LOG_INF("SBUS controller connected (failsafe recovery)\n");
+				input_report(dev, INPUT_EV_ABS, INPUT_FAILSAFE_STATUS, 0, false, K_FOREVER);
+			} else {
+				LOG_ERR("SBUS controller disconnected (failsafe)\n");
+				input_report(dev, INPUT_EV_ABS, INPUT_FAILSAFE_STATUS, 1, false, K_FOREVER);
+			}
+			data->controller_connected = controller_connected;
+		}
+
+		frame_lost = (data->sbus_frame[SBUS_BYTE24_IDX] & SBUS_BYTE24_FRAME_LOST);
+		if (frame_lost != data->frame_lost) {
+			if (frame_lost) {
+				LOG_ERR("SBUS frame lost\n");
+				input_report(dev, INPUT_EV_ABS, INPUT_FRAME_LOST_STATUS, 1, false, K_FOREVER);
+			} else {
+				LOG_INF("SBUS frame lost RECOVERY\n");
+				input_report(dev, INPUT_EV_ABS, INPUT_FRAME_LOST_STATUS, 0, false, K_FOREVER);
+			}
+			data->frame_lost = frame_lost;
 		}
 
 		/* Parse the data */
@@ -213,6 +254,12 @@ static void sbus_resync(const struct device *uart_dev, struct input_sbus_data *c
 			} else if (rd_data[0] == SBUS_HEADER &&
 				   rd_data[SBUS_FRAME_LEN - 1] == SBUS_FOOTER) {
 				data->in_sync = true;
+				//FIXME: added by Michal
+				if (!data->receiver_connected && rd_data[0] == SBUS_HEADER && rd_data[SBUS_FRAME_LEN - 1] == SBUS_FOOTER) {
+					data->receiver_connected = true;
+					// printk("SBUS receiver connected (UART synced)\n");
+					input_report(uart_dev, INPUT_EV_ABS, INPUT_RECEIVER_CONN_STATUS, 1, false, K_FOREVER);
+				}
 			} else {
 				/* Dummy read to clear fifo */
 				uart_fifo_read(uart_dev, &rd_data[0], 1);
@@ -301,6 +348,10 @@ static int input_sbus_init(const struct device *dev)
 	data->in_sync = false;
 	data->partial_sync = false;
 	data->last_rx_time = 0;
+
+	data->receiver_connected = false;
+	data->controller_connected = false;
+	data->frame_lost = false;
 
 	for (i = 0; i < config->num_channels; i++) {
 		data->channel_mapping[config->channel_info[i].sbus_channel - 1] = i;

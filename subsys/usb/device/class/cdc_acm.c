@@ -77,6 +77,7 @@ LOG_MODULE_REGISTER(usb_cdc_acm, CONFIG_USB_CDC_ACM_LOG_LEVEL);
 
 /* Serial state notification timeout */
 #define CDC_CONTROL_SERIAL_STATE_TIMEOUT_US 100000
+// #define CDC_CONTROL_SERIAL_STATE_TIMEOUT_US 1000
 
 #define ACM_INT_EP_IDX			0
 #define ACM_OUT_EP_IDX			1
@@ -247,6 +248,8 @@ static void cdc_acm_write_cb(uint8_t ep, int size, void *priv)
 	 */
 	k_work_schedule_for_queue(&USB_WORK_Q, &dev_data->tx_work, size ?
 				  K_NO_WAIT : K_MSEC(CONFIG_CDC_ACM_TX_DELAY_MS));
+	// k_work_schedule_for_queue(&USB_WORK_Q, &dev_data->tx_work, size ?
+	// 			  K_NO_WAIT : K_MSEC(10));
 }
 
 static void tx_work_handler(struct k_work *work)

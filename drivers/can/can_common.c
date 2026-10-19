@@ -65,6 +65,7 @@ int z_impl_can_send(const struct device *dev, const struct can_frame *frame,
 		k_sem_init(&ctx.done, 0, 1);
 
 		err = api->send(dev, frame, timeout, can_tx_default_cb, &ctx);
+
 		if (err != 0) {
 			return err;
 		}

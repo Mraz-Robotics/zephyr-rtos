@@ -1,0 +1,45 @@
+description: |
+  Group of GPIO-controlled inputs.
+
+  Each input is defined in a child node of the gpio-inputs node.
+
+  Here is an example which defines three inputs in the node /inputs:
+
+  / {
+    inputs {
+       compatible = "mr,gpio-input";
+       in_0: in_0 {
+          gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+       };
+       in_1: in_1 {
+          gpios = <&gpio0 2 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+       };
+       in_2: in_2 {
+          gpios = <&gpio1 15 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+       };
+    };
+  };
+
+  Above:
+
+  - in_0 is pin 1 on gpio0, read as active when the pin is low.
+  - in_1 is pin 2 on gpio0, read as active when the pin is high,
+    with the internal pull-down enabled.
+  - in_2 is pin 15 on gpio1, read as active when the pin is low,
+    with the internal pull-up enabled.
+
+compatible: "mr,gpio-input"
+
+child-binding:
+  description: GPIO input pin child node
+  compatible: "mr,gpio-input-pin"
+  properties:
+    gpios:
+      type: phandle-array
+      required: true
+    label:
+      type: string
+      description: |
+        Human readable string describing the pin. It can be used by an
+        application to identify this pin or to retrieve its number/index
+        (i.e. child node number) on the parent device.

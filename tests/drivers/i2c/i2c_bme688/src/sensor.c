@@ -12,7 +12,7 @@ int32_t calculate_temperature(uint32_t adc_temp, int32_t *t_fine,
 {
 	int16_t temperature_compensated = 0;
 	int64_t var1, var2, var3;
-
+e
 	var1 = ((int32_t)adc_temp >> 3) - ((int32_t)cal_coeffs->par_t1 << 1);
 	var2 = (var1 * (int32_t)cal_coeffs->par_t2) >> 11;
 	var3 = ((var1 >> 1) * (var1 >> 1)) >> 12;
